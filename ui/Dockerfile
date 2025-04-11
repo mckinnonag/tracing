@@ -1,22 +1,17 @@
-FROM node:20-alpine AS development-dependencies-env
-COPY . /app
-WORKDIR /app
-RUN npm ci
+FROM node:22-bookworm-slim AS builder
+WORKDIR "/var/task"
+ADD . .
+RUN npm install
+RUN npm run build 
+RUN npm prune --omit=dev
 
-FROM node:20-alpine AS production-dependencies-env
-COPY ./package.json package-lock.json /app/
-WORKDIR /app
-RUN npm ci --omit=dev
+FROM node:22-bookworm-slim
 
-FROM node:20-alpine AS build-env
-COPY . /app/
-COPY --from=development-dependencies-env /app/node_modules /app/node_modules
-WORKDIR /app
-RUN npm run build
+WORKDIR "/var/task"
+COPY --from=builder  /var/task/server.js /var/task/server.js
+COPY --from=builder  /var/task/node_modules /var/task/node_modules
+COPY --from=builder  /var/task/package.json /var/task/package.json
+COPY --from=builder  /var/task/build /var/task/build
 
-FROM node:20-alpine
-COPY ./package.json package-lock.json /app/
-COPY --from=production-dependencies-env /app/node_modules /app/node_modules
-COPY --from=build-env /app/build /app/build
-WORKDIR /app
-CMD ["npm", "run", "start"]
+ENV NODE_ENV=production PORT=3000
+CMD ["node", "server.js"]

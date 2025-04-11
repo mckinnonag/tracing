@@ -1,5 +1,4 @@
 import type { Route } from "./+types/home";
-import { Welcome } from "../welcome/welcome";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -8,6 +7,16 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-export default function Home() {
-  return <Welcome />;
+export async function loader() {
+  const response = await fetch("http://backend:5000");
+  if (!response.ok) {
+    throw new Response("Failed to fetch data", { status: response.status });
+  }
+  const data = await response.json();
+  return {data};
+}
+
+export default function Home({ loaderData }: Route.ComponentProps) {
+  const { data } = loaderData
+  return <p>{data.message}</p>
 }
