@@ -4,13 +4,16 @@ import (
 	"context"
 	"errors"
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
 
+	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel/log/global"
 )
 
 func main() {
@@ -62,16 +65,25 @@ func newHTTPHandler() http.Handler {
 		mux.Handle(pattern, handler)
 	}
 
-	h := handler{}
+	provider := global.GetLoggerProvider()
+	logger := otelslog.NewLogger("example-service", otelslog.WithLoggerProvider(provider))
+
+	h := handler{
+		logger: logger,
+	}
 	handleFunc("/", h.base)
 
 	handler := otelhttp.NewHandler(mux, "/")
 	return handler
 }
 
-type handler struct{}
+type handler struct {
+	logger *slog.Logger
+}
 
 func (h handler) base(w http.ResponseWriter, r *http.Request) {
+	h.logger.Info("hello world", slog.String("path", r.URL.Path))
+
 	w.Header().Set("content-type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"message":"hello,world"}`))
