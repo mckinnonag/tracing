@@ -12,7 +12,6 @@ import (
 	"go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 )
 
 // setupOTelSDK bootstraps the OpenTelemetry pipeline.
@@ -38,12 +37,11 @@ func setupOTelSDK(ctx context.Context) (shutdown func(context.Context) error, er
 	prop := newPropagator()
 	otel.SetTextMapPropagator(prop)
 
-	resource, err := resource.New(
-		context.Background(),
-		resource.WithAttributes(
-			semconv.ServiceName("example-service"),
-		),
-	)
+	resource, err := resource.New(ctx)
+	if err != nil {
+		handleErr(err)
+		return
+	}
 
 	tracerProvider, err := newTracerProvider(ctx, resource)
 	if err != nil {
