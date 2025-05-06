@@ -20,21 +20,17 @@ func main() {
 }
 
 func run() error {
-	// Handle SIGINT (CTRL+C) gracefully.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	// Set up OpenTelemetry.
 	otelShutdown, err := setupOTelSDK(ctx)
 	if err != nil {
 		return err
 	}
-	// Handle shutdown properly so nothing leaks.
 	defer func() {
 		err = errors.Join(err, otelShutdown(context.Background()))
 	}()
 
-	// Start HTTP server.
 	srv := &http.Server{
 		Addr:         ":5000",
 		BaseContext:  func(_ net.Listener) context.Context { return ctx },
@@ -47,18 +43,13 @@ func run() error {
 		srvErr <- srv.ListenAndServe()
 	}()
 
-	// Wait for interruption.
 	select {
 	case err = <-srvErr:
-		// Error when starting HTTP server.
 		return err
 	case <-ctx.Done():
-		// Wait for first CTRL+C.
-		// Stop receiving signal notifications as soon as possible.
 		stop()
 	}
 
-	// When Shutdown is called, ListenAndServe immediately returns ErrServerClosed.
 	err = srv.Shutdown(context.Background())
 	return err
 }
@@ -66,19 +57,14 @@ func run() error {
 func newHTTPHandler() http.Handler {
 	mux := http.NewServeMux()
 
-	// handleFunc is a replacement for mux.HandleFunc
-	// which enriches the handler's HTTP instrumentation with the pattern as the http.route.
 	handleFunc := func(pattern string, handlerFunc func(http.ResponseWriter, *http.Request)) {
-		// Configure the "http.route" for the HTTP instrumentation.
 		handler := otelhttp.WithRouteTag(pattern, http.HandlerFunc(handlerFunc))
 		mux.Handle(pattern, handler)
 	}
 
-	// Register handlers.
 	h := handler{}
 	handleFunc("/", h.base)
 
-	// Add HTTP instrumentation for the whole server.
 	handler := otelhttp.NewHandler(mux, "/")
 	return handler
 }
